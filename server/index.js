@@ -4,6 +4,8 @@ const os = require('os');
 const config = require('./config');
 const ollama = require('./ollama');
 const storage = require('./storage');
+const memory = require('./memory');
+const { handleCommand } = require('./commands');
 const SYSTEM_PROMPT = require('./persona');
 
 const app = express();
@@ -68,14 +70,24 @@ app.post('/api/conversations/:id/messages', async (req, res) => {
     conv.title = userText.slice(0, 48);
   }
 
-  const modelMessages = [
-    ...(config.persona ? [{ role: 'system', content: SYSTEM_PROMPT }] : []),
-    ...conv.messages.map((m) => ({ role: m.role, content: m.content })),
-  ];
-
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.setHeader('Transfer-Encoding', 'chunked');
   res.setHeader('X-Accel-Buffering', 'no');
+
+  const cmd = handleCommand(userText);
+  if (cmd.handled) {
+    res.write(cmd.reply);
+    conv.messages.push({ role: 'assistant', content: cmd.reply, at: new Date().toISOString() });
+    conv.updatedAt = new Date().toISOString();
+    storage.saveConversation(conv);
+    return res.end();
+  }
+
+  const systemPrompt = SYSTEM_PROMPT + memory.asSystemPromptAddendum();
+  const modelMessages = [
+    ...(config.persona ? [{ role: 'system', content: systemPrompt }] : []),
+    ...conv.messages.map((m) => ({ role: m.role, content: m.content })),
+  ];
 
   let full = '';
   try {

@@ -1,6 +1,8 @@
 const config = require('./config');
 const ollama = require('./ollama');
 const storage = require('./storage');
+const memory = require('./memory');
+const { handleCommand } = require('./commands');
 const SYSTEM_PROMPT = require('./persona');
 
 const TELEGRAM_MESSAGE_LIMIT = 4000;
@@ -65,15 +67,22 @@ async function handleMessage(msg) {
   }
   if (text === '/reset') {
     storage.deleteConversation(`telegram-${chatId}`);
-    await sendMessage(chatId, 'Memory cleared. Starting fresh.');
+    await sendMessage(chatId, 'Conversation cleared. Starting fresh.');
+    return;
+  }
+
+  const cmd = handleCommand(text);
+  if (cmd.handled) {
+    await sendMessage(chatId, cmd.reply);
     return;
   }
 
   const conv = storage.getOrCreateConversation(`telegram-${chatId}`, `Telegram chat ${chatId}`);
   conv.messages.push({ role: 'user', content: text, at: new Date().toISOString() });
 
+  const systemPrompt = SYSTEM_PROMPT + memory.asSystemPromptAddendum();
   const modelMessages = [
-    ...(config.persona ? [{ role: 'system', content: SYSTEM_PROMPT }] : []),
+    ...(config.persona ? [{ role: 'system', content: systemPrompt }] : []),
     ...conv.messages.map((m) => ({ role: m.role, content: m.content })),
   ];
 

@@ -11,6 +11,10 @@ browser or from your phone as an installable app.
 - 💬 **Optional Telegram bot** — talk to JARVIS from the Telegram app you already have on your phone
   and PC, from anywhere with a data connection, no shared wifi or VPN needed (see
   [Telegram bot](#telegram-bot) below).
+- ⌨️ **A `jarvis` command** — one command gives you an interactive terminal chat, plus
+  `jarvis status`/`model`/`memory` etc. (see [The `jarvis` CLI](#the-jarvis-cli) below).
+- 🧵 **Long-term memory** — tell it `/remember <fact>` once and it recalls that fact in every future
+  conversation, on every interface, not just within one chat's history.
 - 🖐️ **Touch-first UI** — off-canvas navigation drawer, large tap targets, fixed bottom composer,
   safe-area aware for notched phones.
 - 💾 **Local history** — conversations are stored as plain JSON files on your PC, never sent anywhere.
@@ -108,13 +112,62 @@ forth, the same way any Telegram chat works.
    TELEGRAM_BOT_TOKEN=123456789:AAExampleTokenHere TELEGRAM_ALLOWED_CHAT_ID=987654321 npm run telegram
    ```
 
-Send `/reset` in the chat at any time to clear that conversation's memory. The bot polls Telegram for
+Send `/reset` in the chat at any time to clear that conversation's history (long-term memory, covered
+below, is separate and untouched by `/reset`). The bot polls Telegram for
 new messages (no inbound port or public URL needed) and can run alongside `npm start` — they share
 the same Ollama connection but keep separate conversation histories.
 
 > Leave this running as a background process if you want it reachable at all times, since it only
 > responds while the machine is awake and the process is running. See the next section for a way to
 > run it as a proper always-on service.
+
+## The `jarvis` CLI
+
+Once dependencies are installed (`npm install`), a single `jarvis` command gives you a terminal-based
+interface on top of everything above — handy for quickly chatting without opening a browser or
+Telegram, and for managing JARVIS from the command line.
+
+```bash
+npm link          # makes the `jarvis` command available globally (one-time)
+jarvis            # start an interactive chat right here in the terminal
+```
+
+(On a Pi set up with [the one-line installer](#one-line-install) below, `jarvis` is already on your
+`PATH` — no `npm link` needed.)
+
+| Command | What it does |
+|---|---|
+| `jarvis` / `jarvis chat` | Start an interactive chat in this terminal |
+| `jarvis web` | Run the web/PWA server (same as `npm start`) |
+| `jarvis telegram` | Run the Telegram bot (same as `npm run telegram`) |
+| `jarvis model [name]` | Show the current model + locally available models, or switch models |
+| `jarvis status` | Check Ollama connection, current model, persona, memory |
+| `jarvis memory` | List everything JARVIS remembers long-term |
+| `jarvis remember <fact>` | Save something to long-term memory |
+| `jarvis forget <n\|all>` | Remove one memory entry (number from `jarvis memory`), or all |
+| `jarvis reset` | Clear the CLI chat's own conversation history |
+| `jarvis help` | Show all commands |
+
+`jarvis model llama3.2:3b` writes the change to `.env`, so it takes effect the next time any
+interface (CLI, web, or Telegram) starts — no need to remember an environment variable each time.
+
+## Long-term memory
+
+Every interface shares one long-term memory, stored in `data/memory.json` on your machine. Inside
+*any* chat — CLI, web, or Telegram — the same slash commands work:
+
+```
+/remember I'm allergic to peanuts
+/memory
+/forget 1
+/forget all
+```
+
+Facts you save are included in JARVIS's context for every future conversation on every interface, so
+telling it something once in Telegram means it also knows it next time you open the web app or the
+CLI. This is a simple, explicit memory (you decide what's remembered) rather than the kind of agent
+that infers and files away facts on its own — reliable on a small local model, at the cost of needing
+you to say `/remember` for things you want it to keep.
 
 ## Running on a Raspberry Pi (always-on)
 
@@ -132,9 +185,11 @@ curl -fsSL https://raw.githubusercontent.com/CoolBeanz1/ClaudeProjectos/main/ins
 ```
 
 This installs Node.js and Ollama if they're missing, pulls the `llama3.2:1b` model, clones this repo
-to `~/jarvis`, and sets up a systemd service (`jarvis-web`) so the web interface starts on boot and
-restarts automatically if it ever crashes. It prints the URL to open when it's done. It's safe to
-re-run any time (e.g. after a `git pull`-worthy update) — it skips what's already installed.
+to `~/jarvis`, sets up a systemd service (`jarvis-web`) so the web interface starts on boot and
+restarts automatically if it ever crashes, and puts the [`jarvis` CLI](#the-jarvis-cli) on your `PATH`
+so you can just type `jarvis` from any terminal on the Pi. It prints the URL to open when it's done.
+It's safe to re-run any time (e.g. after a `git pull`-worthy update) — it skips what's already
+installed.
 
 To also stand up the Telegram bot as a service in the same step, export a bot token first (see
 [Telegram bot](#telegram-bot) for how to get one from @BotFather):
@@ -189,13 +244,17 @@ JARVIS_PERSONA=false npm start
 ## Project layout
 
 ```
+bin/
+  jarvis.js       The `jarvis` CLI: terminal chat + status/model/memory commands
 server/
   index.js        Express app + routes (web/PWA interface)
   telegram-bot.js Telegram long-polling bot (optional interface)
   ollama.js       Streaming client for the local Ollama API
   storage.js      Conversation history, stored as JSON files in data/
+  memory.js       Long-term memory shared across all interfaces
+  commands.js     Shared /remember, /memory, /forget slash-command handling
   persona.js      Shared JARVIS system prompt
-  config.js       Port, model, persona, Ollama host, Telegram — all overridable via env vars
+  config.js       Port, model, persona, Ollama host, Telegram — all overridable via env vars / .env
 public/
   index.html    App shell
   styles.css    HUD-styled, touch-first UI
@@ -204,11 +263,12 @@ public/
   service-worker.js  Caches the app shell so it loads instantly / offline
 data/
   conversations/*.json   Your chat history (gitignored — stays on your PC)
+  memory.json             Long-term memory facts (gitignored — stays on your PC)
 deploy/
   jarvis-web.service       systemd unit template for the web interface
   jarvis-telegram.service  systemd unit template for the Telegram bot
 install.sh          One-line installer for Raspberry Pi / Debian / Ubuntu
-.env.example         Template for .env (used by the systemd services)
+.env.example         Template for .env (used by the systemd services and the CLI)
 ```
 
 ## Troubleshooting
