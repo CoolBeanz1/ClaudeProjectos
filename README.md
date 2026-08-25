@@ -8,6 +8,9 @@ browser or from your phone as an installable app.
   model is downloaded, JARVIS never calls out to the internet.
 - 📱 **Phone + PC access** — it's an installable Progressive Web App (PWA). Add it to your phone's
   home screen and it looks and feels like a native app.
+- 💬 **Optional Telegram bot** — talk to JARVIS from the Telegram app you already have on your phone
+  and PC, from anywhere with a data connection, no shared wifi or VPN needed (see
+  [Telegram bot](#telegram-bot) below).
 - 🖐️ **Touch-first UI** — off-canvas navigation drawer, large tap targets, fixed bottom composer,
   safe-area aware for notched phones.
 - 💾 **Local history** — conversations are stored as plain JSON files on your PC, never sent anywhere.
@@ -81,6 +84,34 @@ and forth, it's not a cloud AI service.
 > Do **not** port-forward 3000 directly on your router and expose it to the open internet — there's
 > no authentication built in, and anyone could reach your assistant (and your PC's local network).
 
+## Telegram bot
+
+This gives you a "webpage-free" way to talk to JARVIS from your phone or PC using the Telegram app
+you likely already have — no PWA install, no shared wifi, no Tailscale. Your PC still does 100% of
+the actual thinking through Ollama; Telegram's servers only relay the text of your messages back and
+forth, the same way any Telegram chat works.
+
+1. **Create the bot** — in Telegram, message [@BotFather](https://t.me/BotFather), send `/newbot`,
+   and follow the prompts. It gives you a token that looks like `123456789:AAExampleTokenHere`.
+2. **Run the bot** on the same PC that's running Ollama:
+   ```bash
+   TELEGRAM_BOT_TOKEN=123456789:AAExampleTokenHere npm run telegram
+   ```
+3. **Message your bot** in Telegram and send `/start`. It replies with your numeric chat ID.
+4. **Lock it to just you** (recommended — anyone who finds your bot's username could otherwise talk
+   to it too). Stop the bot, then restart it with your chat ID set:
+   ```bash
+   TELEGRAM_BOT_TOKEN=123456789:AAExampleTokenHere TELEGRAM_ALLOWED_CHAT_ID=987654321 npm run telegram
+   ```
+
+Send `/reset` in the chat at any time to clear that conversation's memory. The bot polls Telegram for
+new messages (no inbound port or public URL needed) and can run alongside `npm start` — they share
+the same Ollama connection but keep separate conversation histories.
+
+> Leave this running as a background process (e.g. via `pm2`, a systemd service, or just a terminal
+> you don't close) if you want it reachable at all times, since it only responds while the PC is
+> awake and the process is running.
+
 ## Persona
 
 JARVIS is given a short system prompt so it responds in character (concise, dry-witted, addresses you
@@ -94,10 +125,12 @@ JARVIS_PERSONA=false npm start
 
 ```
 server/
-  index.js      Express app + routes
-  ollama.js     Streaming client for the local Ollama API
-  storage.js    Conversation history, stored as JSON files in data/
-  config.js     Port, model, persona, Ollama host — all overridable via env vars
+  index.js        Express app + routes (web/PWA interface)
+  telegram-bot.js Telegram long-polling bot (optional interface)
+  ollama.js       Streaming client for the local Ollama API
+  storage.js      Conversation history, stored as JSON files in data/
+  persona.js      Shared JARVIS system prompt
+  config.js       Port, model, persona, Ollama host, Telegram — all overridable via env vars
 public/
   index.html    App shell
   styles.css    HUD-styled, touch-first UI

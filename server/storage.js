@@ -54,10 +54,25 @@ function createConversation() {
   return conv;
 }
 
+function getOrCreateConversation(id, title) {
+  const existing = getConversation(id);
+  if (existing) return existing;
+  const conv = {
+    id,
+    title: title || 'New conversation',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    messages: [],
+  };
+  saveConversation(conv);
+  return conv;
+}
+
 module.exports = {
   listConversations,
   getConversation,
   saveConversation,
   deleteConversation,
   createConversation,
+  getOrCreateConversation,
 };
