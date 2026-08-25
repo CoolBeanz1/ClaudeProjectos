@@ -1,0 +1,19 @@
+[Unit]
+Description=J.A.R.V.I.S. Telegram bot
+After=network-online.target ollama.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Change to the user you'll run JARVIS as (default 'pi' user on Raspberry Pi OS)
+User=pi
+# Change to wherever you cloned the repo
+WorkingDirectory=/home/pi/ClaudeProjectos
+EnvironmentFile=/home/pi/ClaudeProjectos/.env
+# Run `which npm` and replace this with the absolute path it prints
+ExecStart=/usr/bin/npm run telegram
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
