@@ -6,4 +6,6 @@ module.exports = {
   defaultModel: process.env.JARVIS_MODEL || 'llama3.2',
   persona: process.env.JARVIS_PERSONA !== 'false',
   dataDir: path.join(__dirname, '..', 'data'),
+  telegramToken: process.env.TELEGRAM_BOT_TOKEN || '',
+  telegramAllowedChatId: process.env.TELEGRAM_ALLOWED_CHAT_ID || '',
 };
