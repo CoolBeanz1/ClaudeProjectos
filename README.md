@@ -14,6 +14,8 @@ browser or from your phone as an installable app.
 - 🖐️ **Touch-first UI** — off-canvas navigation drawer, large tap targets, fixed bottom composer,
   safe-area aware for notched phones.
 - 💾 **Local history** — conversations are stored as plain JSON files on your PC, never sent anywhere.
+- 🥧 **One-line Raspberry Pi install** — run it 24/7 on a few watts instead of leaving your PC on (see
+  [Running on a Raspberry Pi](#running-on-a-raspberry-pi-always-on) below).
 
 ## How it works
 
@@ -29,13 +31,15 @@ that network never has to touch the internet.
 
 ## Requirements
 
-- **Node.js 18+** on the PC that will run JARVIS.
-- **[Ollama](https://ollama.com/download)** installed and running on that same PC.
+- **Node.js 18+** on the machine that will run JARVIS — a PC, or a small always-on device like a
+  Raspberry Pi (see [Running on a Raspberry Pi](#running-on-a-raspberry-pi-always-on) below).
+- **[Ollama](https://ollama.com/download)** installed and running on that same machine.
 - At least one local model pulled, e.g.:
   ```bash
   ollama pull llama3.2
   ```
-  (Smaller/faster: `llama3.2:1b`. Better quality if your PC can handle it: `llama3.1:8b`, `mistral`, `qwen2.5:7b`, etc.)
+  (Smaller/faster: `llama3.2:1b`. Better quality if your hardware can handle it: `llama3.1:8b`,
+  `mistral`, `qwen2.5:7b`, etc.)
 
 ## Setup
 
@@ -108,9 +112,70 @@ Send `/reset` in the chat at any time to clear that conversation's memory. The b
 new messages (no inbound port or public URL needed) and can run alongside `npm start` — they share
 the same Ollama connection but keep separate conversation histories.
 
-> Leave this running as a background process (e.g. via `pm2`, a systemd service, or just a terminal
-> you don't close) if you want it reachable at all times, since it only responds while the PC is
-> awake and the process is running.
+> Leave this running as a background process if you want it reachable at all times, since it only
+> responds while the machine is awake and the process is running. See the next section for a way to
+> run it as a proper always-on service.
+
+## Running on a Raspberry Pi (always-on)
+
+Running JARVIS on a dedicated Raspberry Pi instead of your main PC means it's reachable 24/7 without
+needing to leave your PC on — for a few watts of power instead of a whole desktop. A **Pi 5 (8GB)**
+handles small models (`llama3.2:1b`, `qwen2.5:1.5b`) at a comfortable chat pace; larger models will
+be slow since the Pi has no GPU for acceleration.
+
+### One-line install
+
+On a fresh Raspberry Pi OS (64-bit) install, SSH in and run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/CoolBeanz1/ClaudeProjectos/main/install.sh | bash
+```
+
+This installs Node.js and Ollama if they're missing, pulls the `llama3.2:1b` model, clones this repo
+to `~/jarvis`, and sets up a systemd service (`jarvis-web`) so the web interface starts on boot and
+restarts automatically if it ever crashes. It prints the URL to open when it's done. It's safe to
+re-run any time (e.g. after a `git pull`-worthy update) — it skips what's already installed.
+
+To also stand up the Telegram bot as a service in the same step, export a bot token first (see
+[Telegram bot](#telegram-bot) for how to get one from @BotFather):
+
+```bash
+export TELEGRAM_BOT_TOKEN=123456789:AAExampleTokenHere
+curl -fsSL https://raw.githubusercontent.com/CoolBeanz1/ClaudeProjectos/main/install.sh | bash
+```
+
+Other options (export before running, or edit `~/jarvis/.env` afterward and re-run the installer to
+apply changes):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `JARVIS_DIR` | `~/jarvis` | Where to install |
+| `JARVIS_MODEL` | `llama3.2:1b` | Model to pull and use |
+| `TELEGRAM_BOT_TOKEN` | _(none)_ | Enables the Telegram bot service |
+| `TELEGRAM_ALLOWED_CHAT_ID` | _(none)_ | Locks the Telegram bot to one chat |
+
+Useful commands afterward:
+
+```bash
+sudo systemctl status jarvis-web        # is it running?
+sudo systemctl restart jarvis-web       # restart it
+journalctl -u jarvis-web -f             # follow its logs
+```
+
+(Swap `jarvis-web` for `jarvis-telegram` for the bot service.)
+
+### Manual setup
+
+Prefer to do it by hand, or running on a non-Debian Linux box? Follow the regular
+[Setup](#setup) and [Telegram bot](#telegram-bot) steps above, then use the systemd unit files in
+[`deploy/`](deploy/) as a starting point — copy them to `/etc/systemd/system/`, edit the `User`,
+`WorkingDirectory`, and `ExecStart` paths for your setup, then:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now jarvis-web
+sudo systemctl enable --now jarvis-telegram   # if you're using the bot too
+```
 
 ## Persona
 
@@ -139,6 +204,11 @@ public/
   service-worker.js  Caches the app shell so it loads instantly / offline
 data/
   conversations/*.json   Your chat history (gitignored — stays on your PC)
+deploy/
+  jarvis-web.service       systemd unit template for the web interface
+  jarvis-telegram.service  systemd unit template for the Telegram bot
+install.sh          One-line installer for Raspberry Pi / Debian / Ubuntu
+.env.example         Template for .env (used by the systemd services)
 ```
 
 ## Troubleshooting
