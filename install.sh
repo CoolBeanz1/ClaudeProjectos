@@ -74,6 +74,11 @@ cd "$INSTALL_DIR"
 log "Installing dependencies..."
 npm install
 
+log "Installing the 'jarvis' command..."
+chmod +x "$INSTALL_DIR/bin/jarvis.js"
+JARVIS_BIN_TARGET="/usr/local/bin/jarvis"
+sudo ln -sf "$INSTALL_DIR/bin/jarvis.js" "$JARVIS_BIN_TARGET"
+
 # --- .env (only created if missing, never overwritten) ---
 if [ ! -f "$INSTALL_DIR/.env" ]; then
   log "Writing $INSTALL_DIR/.env"
@@ -150,6 +155,9 @@ echo ""
 log "Done."
 echo "JARVIS web interface: http://${LAN_IP:-<this-device-ip>}:3000"
 echo "  Check status: sudo systemctl status jarvis-web"
+echo ""
+echo "Try it right now from this terminal: jarvis"
+echo "  jarvis status / jarvis model / jarvis memory  -  see 'jarvis help' for everything"
 if [ -n "${TELEGRAM_BOT_TOKEN:-}" ]; then
   echo "Telegram bot is running. Check status: sudo systemctl status jarvis-telegram"
 else
